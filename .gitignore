@@ -1,0 +1,8 @@
+# Ignore build files
+*.o
+
+# Ignore macOS system files
+.DS_Store
+
+# Optional: ignore SD card if mounted
+/Volumes/
