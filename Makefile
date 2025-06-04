@@ -1,14 +1,17 @@
-NT_API_PATH := api
-INCLUDE_PATH := $(NT_API_PATH)
+# Set correct path to ARM cross-compiler
+CXX := /Applications/ARM/bin/arm-none-eabi-c++
+CXXFLAGS := -std=c++11 -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb \
+            -fno-rtti -fno-exceptions -Os -fPIC -Wall -Iapi
 
-PLUGIN_DIR := plugins/MyFirstPlugin
-PLUGIN_SRC := $(PLUGIN_DIR)/plugin.cpp
-PLUGIN_OBJ := $(PLUGIN_DIR)/plugin.o
+PLUGIN := plugins/sequencer_v1/plugin
+SRC := $(PLUGIN).cpp
+OBJ := $(PLUGIN).o
 
-all: $(PLUGIN_OBJ)
+all: $(OBJ)
+
+$(OBJ): $(SRC)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(PLUGIN_OBJ)
+	rm -f $(OBJ)
 
-$(PLUGIN_OBJ): $(PLUGIN_SRC)
-	arm-none-eabi-c++ -std=c++11 -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -fno-rtti -fno-exceptions -Os -fPIC -Wall -I$(INCLUDE_PATH) -c -o $@ $^

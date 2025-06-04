@@ -3,13 +3,16 @@
     {
       "name": "Mac",
       "includePath": [
-        "${workspaceFolder}/api"
+        "${workspaceFolder}/api/**",
+        "${workspaceFolder}/plugins/**",
+        "${workspaceFolder}/api/distingnt",
+        "${workspaceFolder}/**"
       ],
       "defines": [],
-      "compilerPath": "/usr/bin/clang++",
+      "compilerPath": "/Applications/ARM/bin/arm-none-eabi-g++",
       "cStandard": "c11",
-      "cppStandard": "c++17",
-      "intelliSenseMode": "macos-clang-x64"
+      "cppStandard": "c++11",
+      "intelliSenseMode": "macos-gcc-arm"
     }
   ],
   "version": 4
