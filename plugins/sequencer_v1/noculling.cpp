@@ -1,9 +1,11 @@
-// polywire_plugin_eulerian5_nocull.cpp
+// cube_wireframe_nocull.cpp
 //
-// Disting NT plugin: Draws one of five Eulerian solids (wireframe) on an XY oscilloscope.
-// • Octahedron, Cuboctahedron, Rhombic Dodecahedron, Rhombic Icosahedron, Truncated Octahedron
-// • Each is traversed in a single, precomputed Eulerian cycle (no path‐jumps).
-// • No hidden‐line culling (all edges are always drawn).
+// Disting NT plugin: Draws a rotating wireframe cube on an XY oscilloscope.
+// • The cube is normalised using a single scale factor so all vertices lie on a
+//   unit sphere.
+// • Each edge is traversed in a fixed order with blanked reposition moves so the
+//   geometry is correct with no undesired path jumps.
+// • No hidden‐line culling (all edges are always drawn when the beam is on).
 // • BlankWindow (0…1000 μs) sets per‐edge blank length; BlankPhase (–1000…+1000 μs) shifts that blank window.
 // • Intensity “on” = +5 V, “off” = 0 V.
 //
@@ -12,8 +14,9 @@
 //   2. Rotation    [RotX, RotY, RotZ each 0 – 360°]
 //   3. Camera      [Distance (0.01 – 10), Projection (Ortho/Persp), Polarity (Normal/Inverted)]
 //   4. Routing     [X Out (0–27), Y Out (0–27), Int Out (0–27)]
-//   5. Solids      [Solid (0…499): 0–99=Octa;100–199=Cubo;200–299=RhdDodec;300–399=RhdIcosa;400–499=TruncOcta]
-//   6. Blanking    [BlankWindow (0…1000 μs), BlankPhase (–1000…+1000 μs)]
+//   5. Blanking    [BlankWindow (0…1000 μs), BlankPhase (–1000…+1000 μs)]
+//   6. Quantize    [Resolution (0–100)]
+//   7. AmpMod      [AmpMod, AmpCorse, AmpFine, AmpWave, AmpPhase]
 //
 // All initializer lists exactly match their array dimensions.
 
@@ -26,146 +29,30 @@
 static constexpr int faceSizeMax = 6;
 
 //—-----------------------------------------------------------------------------------------------
-// 1) Vertex & Face Data for Five Eulerian Solids
-//—-----------------------------------------------------------------------------------------------
+// 1) Cube Vertex Data & Drawing Segments
 
-static const int numVertsArr[5]   = {  6, 12, 14, 20, 24 };
-static const int vertOffset[5]    = {  0,  6, 18, 32, 52 };
-
-static const float rawVertsAll[] = {
-    // Octahedron (6 vertices)
-     1.0f,  0.0f,  0.0f,  -1.0f,  0.0f,  0.0f,
-     0.0f,  1.0f,  0.0f,   0.0f, -1.0f,  0.0f,
-     0.0f,  0.0f,  1.0f,   0.0f,  0.0f, -1.0f,
-
-    // Cuboctahedron (12 vertices)
-     1.0f,  1.0f,  0.0f,   1.0f, -1.0f,  0.0f,  -1.0f, -1.0f,  0.0f,  -1.0f,  1.0f,  0.0f,
-     1.0f,  0.0f,  1.0f,   1.0f,  0.0f, -1.0f,  -1.0f,  0.0f, -1.0f,  -1.0f,  0.0f,  1.0f,
-     0.0f,  1.0f,  1.0f,   0.0f,  1.0f, -1.0f,   0.0f, -1.0f, -1.0f,   0.0f, -1.0f,  1.0f,
-
-    // Rhombic Dodecahedron (14 vertices)
-     2.0f,  0.0f,  0.0f,   -2.0f,  0.0f,  0.0f,   0.0f,  2.0f,  0.0f,   0.0f, -2.0f,  0.0f,
-     0.0f,  0.0f,  2.0f,    0.0f,  0.0f, -2.0f,
-     1.0f,  1.0f,  1.0f,    1.0f,  1.0f, -1.0f,   1.0f, -1.0f,  1.0f,   1.0f, -1.0f, -1.0f,
-    -1.0f,  1.0f,  1.0f,   -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f,
-
-    // Rhombic Icosahedron (20 vertices, un‐normalized)
-     1.6180339f,  1.0f,      0.0f,    -1.6180339f,  1.0f,      0.0f,
-     1.6180339f, -1.0f,      0.0f,    -1.6180339f, -1.0f,      0.0f,
-     0.0f,      1.6180339f,  1.0f,     0.0f,     -1.6180339f,  1.0f,
-     0.0f,      1.6180339f, -1.0f,     0.0f,     -1.6180339f, -1.0f,
-     1.0f,      0.0f,      1.6180339f, -1.0f,      0.0f,      1.6180339f,
-     1.0f,      0.0f,     -1.6180339f, -1.0f,      0.0f,     -1.6180339f,
-     1.0f,      1.0f,      1.0f,      1.0f,      1.0f,     -1.0f,
-     1.0f,     -1.0f,      1.0f,      1.0f,     -1.0f,     -1.0f,
-    -1.0f,      1.0f,      1.0f,     -1.0f,      1.0f,     -1.0f,
-    -1.0f,     -1.0f,      1.0f,     -1.0f,     -1.0f,     -1.0f,
-
-    // Truncated Octahedron (24 vertices, un‐normalized)
-     2.0f,  1.0f,  0.0f,   2.0f, -1.0f,  0.0f,   -2.0f,  1.0f,  0.0f,   -2.0f, -1.0f,  0.0f,
-     1.0f,  2.0f,  0.0f,   1.0f, -2.0f,  0.0f,   -1.0f,  2.0f,  0.0f,   -1.0f, -2.0f,  0.0f,
-     2.0f,  0.0f,  1.0f,   2.0f,  0.0f, -1.0f,   -2.0f,  0.0f,  1.0f,   -2.0f,  0.0f, -1.0f,
-     1.0f,  0.0f,  2.0f,   1.0f,  0.0f, -2.0f,   -1.0f,  0.0f,  2.0f,   -1.0f,  0.0f, -2.0f,
-     0.0f,  2.0f,  1.0f,   0.0f,  2.0f, -1.0f,    0.0f, -2.0f,  1.0f,    0.0f, -2.0f, -1.0f,
-     0.0f,  1.0f,  2.0f,   0.0f,  1.0f, -2.0f,    0.0f, -1.0f,  2.0f,    0.0f, -1.0f, -2.0f
+static const float rawCubeVerts[8 * 3] = {
+    -1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f
 };
 
-//—-----------------------------------------------------------------------------------------------
-// 2) Edge & Eulerian‐Cycle Data
-//—-----------------------------------------------------------------------------------------------
+struct Segment { uint8_t a; uint8_t b; uint8_t draw; };
 
-static const int numEdgesArr[5]    = { 12, 24, 24, 30, 36 };
-static const int edgeOffsetArr[5]   = {  0, 12, 36, 60, 90 };
-
-// Octahedron: 12 edges → 24 numbers
-static const uint8_t edgesOctahedron[12 * 2] = {
-     0,  2,   2,  4,   4,  0,
-     0,  5,   5,  2,   2,  0,
-     4,  5,   5,  3,   3,  4,
-     1,  2,   2,  3,   3,  1
+static const Segment cubeSegments[] = {
+    {0,1,1}, {1,2,1}, {2,3,1}, {3,0,1},
+    {0,4,1}, {4,5,1}, {5,6,1}, {6,7,1}, {7,4,1},
+    {4,1,0}, {1,5,1}, {5,2,0}, {2,6,1}, {6,3,0},
+    {3,7,1}, {7,0,0}
 };
 
-// Cuboctahedron: 24 edges → 48 numbers
-static const uint8_t edgesCuboctahedron[24 * 2] = {
-     0,  4,   0,  5,   0,  8,   0,  9,
-     1,  4,   1,  5,   1, 10,   1, 11,
-     2,  6,   2,  7,   2, 10,   2, 11,
-     3,  6,   3,  7,   3,  8,   3,  9,
-     4,  8,   4, 11,   5,  9,   5, 10,
-     6,  9,   6, 10,   7,  8,   7, 11
-};
+static const int numSegments = sizeof(cubeSegments)/sizeof(cubeSegments[0]);
 
-// Rhombic Dodecahedron: 24 edges → 48 numbers
-static const uint8_t edgesRhdDodec[24 * 2] = {
-     0,  6,   0, 10,   0,  2,    1,  7,   1, 11,   1,  3,
-     2,  6,   2,  8,   2, 10,    3,  7,   3,  9,   3, 11,
-     4,  8,   4, 10,   4,  6,    5,  9,   5, 11,   5,  7,
-     6,  8,   7,  9,  10, 12,   11, 13,  12,  6,   13,  7
-};
-
-// Rhombic Icosahedron: 30 edges → 60 numbers
-static const uint8_t edgesRhdIcosahedron[30 * 2] = {
-     0,  4,   4, 16,  16,  8,    8, 12,  12,  0,
-     0, 12,  12,  1,   1,   8,    1,  9,   9, 13,
-    13,  0,   1,  5,   5,  17,   17,  9,   2,  5,
-     5, 15,  15, 10,  10,  14,   14,  2,   2, 10,
-     3,  6,   6, 18,  18, 11,   11, 19,  19,  3,
-     2,  3,   3, 14,  14,  6,    6, 16,   7, 15
-};
-
-// Truncated Octahedron: 36 edges → 72 numbers
-static const uint8_t edgesTruncOctahedron[36 * 2] = {
-     0,  1,    0,  4,   0,  6,     1,  5,   1,  7,   2,  3,
-     2,  6,    2,  8,   3,  7,     4,  8,   4, 10,   5,  9,
-     6, 10,    6, 14,   7,  9,     8, 16,   8, 12,   9, 17,
-    10, 12,   10, 18,  11, 13,    12, 16,  12, 20,  13, 17,
-    14, 18,   14, 22,  15, 19,    16, 18,  16, 24,  17, 23,
-    18, 20,   18, 24,  19, 23,    20, 22,  20, 24,  21, 23
-};
-
-//—-----------------------------------------------------------------------------------------------
-// 3) Eulerian‐Cycle Data
-//—-----------------------------------------------------------------------------------------------
-
-static const uint8_t eulerOcta[12] = {
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11
-};
-
-static const uint8_t eulerCubo[24] = {
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,
-    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
-};
-
-static const uint8_t eulerRhdDodec[24] = {
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,
-    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
-};
-
-static const uint8_t eulerRhdIcosa[30] = {
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
-    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-    20, 21, 22, 23, 24, 25, 26, 27, 28, 29
-};
-
-static const uint8_t eulerTruncOcta[36] = {
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,
-    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-    24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35
-};
-
-//—-----------------------------------------------------------------------------------------------
-// 4) Offsets & Counts
-//—-----------------------------------------------------------------------------------------------
-
-static const int numEdgesAll[5]     = { 12, 24, 24, 30, 36 };
-static const int edgeOffsetAll[5]   = {  0, 12, 36, 60, 90 };
-static const int eulerOffsetAll[5]  = {  0, 12, 36, 60, 90 };
-static const int eulerLengthAll[5]  = { 12, 24, 24, 30, 36 };
-
-static const int numFacesAll[5]     = {  8,  14,  12,  20,  14 };
-static const int faceOffsetAll[5]   = {  0,   8,  22,  34,  54 };
-
-//—-----------------------------------------------------------------------------------------------
 // 5) Parameter Definitions
 //—-----------------------------------------------------------------------------------------------
 
@@ -213,7 +100,7 @@ static const _NT_parameter paramDistance = {
     .name        = "Distance",
     .min         = 1,    // scales 0.01…10.00
     .max         = 1000,
-    .def         = 100,
+    .def         = 500,
     .unit        = kNT_unitNone,
     .scaling     = kNT_scalingNone,
     .enumStrings = NULL
@@ -271,15 +158,6 @@ static const _NT_parameter paramIOut = {
     .enumStrings = NULL
 };
 
-static const _NT_parameter paramSolid = {
-    .name        = "Solid",
-    .min         = 0,
-    .max         = 499,
-    .def         = 0,
-    .unit        = kNT_unitNone,
-    .scaling     = kNT_scalingNone,
-    .enumStrings = NULL
-};
 
 static const _NT_parameter paramBlankWindow = {
     .name        = "BlankWindow",
@@ -301,6 +179,85 @@ static const _NT_parameter paramBlankPhase = {
     .enumStrings = NULL
 };
 
+// Frequency Modulation parameters ------------------------------------------------
+
+static const char* const modCourseStrings[] = {
+    "/4", "/3", "/2", "0",
+    "x2",  "x3",  "x4",  "x5",  "x6",  "x7",  "x8",  "x9",
+    "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17",
+    "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25",
+    "x26", "x27", "x28", "x29", "x30", "x31", "x32",
+    NULL
+};
+
+
+// Amplitude Modulation parameters ------------------------------------------------
+static const _NT_parameter paramResolution = {
+    .name        = "Resolution",
+    .min         = 0,
+    .max         = 100,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+// Amplitude Modulation parameters ----------------------------------------------
+
+static const _NT_parameter paramAmpMod = {
+    .name        = "AmpMod",
+    .min         = 0,
+    .max         = 127,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramAmpCorse = {
+    .name        = "AmpCorse",
+    .min         = 0,
+    .max         = 34,
+    .def         = 4,
+    .unit        = kNT_unitEnum,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = modCourseStrings
+};
+
+static const char* const modWaveStrings[] = {
+    "Square", "Triangle", "Saw", "Ramp", "Sine", NULL
+};
+
+static const _NT_parameter paramAmpFine = {
+    .name        = "AmpFine",
+    .min         = -100,
+    .max         = 100,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramAmpWave = {
+    .name        = "AmpWave",
+    .min         = 0,
+    .max         = 4,
+    .def         = 4,
+    .unit        = kNT_unitEnum,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = modWaveStrings
+};
+
+static const _NT_parameter paramAmpPhase = {
+    .name        = "AmpPhase",
+    .min         = 0,
+    .max         = 360,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
 static const _NT_parameter allParams[] = {
     paramFreq,         //  0
     paramRotX,         //  1
@@ -312,29 +269,36 @@ static const _NT_parameter allParams[] = {
     paramXOut,         //  7
     paramYOut,         //  8
     paramIOut,         //  9
-    paramSolid,        // 10
-    paramBlankWindow,  // 11
-    paramBlankPhase    // 12
+    paramBlankWindow,  // 10
+    paramBlankPhase,   // 11
+    paramResolution,   // 12
+    paramAmpMod,       // 13
+    paramAmpCorse,     // 14
+    paramAmpFine,      // 15
+    paramAmpWave,      // 16
+    paramAmpPhase      // 17
 };
 
-static const uint8_t page1_indices[] = {  0 };
-static const uint8_t page2_indices[] = {  1,  2,  3 };
-static const uint8_t page3_indices[] = {  4,  5,  6 };
-static const uint8_t page4_indices[] = {  7,  8,  9 };
-static const uint8_t page5_indices[] = { 10 };
-static const uint8_t page6_indices[] = { 11, 12 };
+static const uint8_t page1_indices[] = { 0 };
+static const uint8_t page2_indices[] = { 1, 2, 3 };
+static const uint8_t page3_indices[] = { 4, 5, 6 };
+static const uint8_t page4_indices[] = { 7, 8, 9 };
+static const uint8_t page5_indices[] = { 10, 11 };
+static const uint8_t page6_indices[] = { 12 };
+static const uint8_t page7_indices[] = { 13, 14, 15, 16, 17 };
 
 static const _NT_parameterPage pages[] = {
     { "Frequency",   1,  page1_indices },
     { "Rotation",    3,  page2_indices },
     { "Camera",      3,  page3_indices },
     { "Routing",     3,  page4_indices },
-    { "Solids",      1,  page5_indices },
-    { "Blanking",    2,  page6_indices }
+    { "Blanking",    2,  page5_indices },
+    { "Quantize",    1,  page6_indices },
+    { "AmpMod",      5,  page7_indices }
 };
 
 static const _NT_parameterPages parameterPages = {
-    .numPages = 6,
+    .numPages = 7,
     .pages    = pages
 };
 
@@ -352,10 +316,18 @@ struct PolyInstance : public _NT_algorithm {
     int   projectionMode; // 0=Ortho, 1=Persp
     int   polarity;       // 0=Normal, 1=Inverted
     int   xOutBus, yOutBus, iOutBus;
-    int   solidParam;     // 0..499
+
+    // Amplitude modulation state
+    float ampModAmt;       // 0..1
+    int   ampCorseIdx;     // 0..34
+    int   ampFine;         // -100..100 (0.1 Hz units)
+    int   ampWave;         // 0..4
+    float ampPhaseOffset;  // 0..1
+    float ampPhase;        // 0..1 running phase
 
     float blankWindow_us; // 0…1000 μs
     float blankPhase_us;  // –1000…+1000 μs
+    int   resolution;     // 0..100
 
     PolyInstance() {
         parameters       = nullptr;
@@ -367,11 +339,17 @@ struct PolyInstance : public _NT_algorithm {
         sinY = 0.0f; cosY = 1.0f;
         sinZ = 0.0f; cosZ = 1.0f;
         freq_Hz          = 50.0f;
-        cameraDist       = 1.0f;
+        cameraDist       = 5.0f;
         projectionMode   = 1;
         polarity         = 0;
         xOutBus = 12; yOutBus = 13; iOutBus = 14;
-        solidParam       = 0;
+        resolution       = 0;
+        ampModAmt        = 0.0f;
+        ampCorseIdx      = 4;
+        ampFine          = 0;
+        ampWave          = 4;
+        ampPhaseOffset   = 0.0f;
+        ampPhase         = 0.0f;
         blankWindow_us   = 10.0f;
         blankPhase_us    = 0.0f;
     }
@@ -381,52 +359,35 @@ struct PolyInstance : public _NT_algorithm {
 // 7) Shared DRAM Allocation & Initialization
 //—-----------------------------------------------------------------------------------------------
 
-static const int SHARED_DRAM_BYTES = 4096;
+static const int SHARED_DRAM_BYTES = 256;
 
-static float (*sharedVerts)[3]    = nullptr;
-static uint8_t* sharedEdges       = nullptr;
-static uint8_t* sharedEulerOrder  = nullptr;
+
+static float (*sharedVerts)[3] = nullptr;
 
 void calculateStaticRequirements(_NT_staticRequirements& req) {
-    // ~1500 bytes needed; allocate 4096 for safety.
     req.dram = SHARED_DRAM_BYTES;
 }
 
 void initialise(_NT_staticMemoryPtrs& ptrs, const _NT_staticRequirements& /*req*/) {
     uint8_t* dram = ptrs.dram;
-
-    // 1) Copy and normalize vertices
     sharedVerts = reinterpret_cast<float(*)[3]>(dram);
-    memcpy(sharedVerts, rawVertsAll, sizeof(rawVertsAll));
-    int totalVerts = numVertsArr[0] + numVertsArr[1] + numVertsArr[2] +
-                     numVertsArr[3] + numVertsArr[4];
-    for (int vi = 0; vi < totalVerts; ++vi) {
-        float x = sharedVerts[vi][0];
-        float y = sharedVerts[vi][1];
-        float z = sharedVerts[vi][2];
+    memcpy(sharedVerts, rawCubeVerts, sizeof(rawCubeVerts));
+
+    float maxL = 0.0f;
+    for (int i = 0; i < 8; ++i) {
+        float x = sharedVerts[i][0];
+        float y = sharedVerts[i][1];
+        float z = sharedVerts[i][2];
         float L = sqrtf(x*x + y*y + z*z);
-        if (L > 0.0f) {
-            sharedVerts[vi][0] = x / L;
-            sharedVerts[vi][1] = y / L;
-            sharedVerts[vi][2] = z / L;
-        }
+        if (L > maxL) maxL = L;
     }
-
-    // 2) Copy edges
-    sharedEdges = dram + (totalVerts * 3 * sizeof(float));
-    memcpy(sharedEdges + edgeOffsetAll[0]*2, edgesOctahedron,      12 * 2);
-    memcpy(sharedEdges + edgeOffsetAll[1]*2, edgesCuboctahedron,  24 * 2);
-    memcpy(sharedEdges + edgeOffsetAll[2]*2, edgesRhdDodec,       24 * 2);
-    memcpy(sharedEdges + edgeOffsetAll[3]*2, edgesRhdIcosahedron, 30 * 2);
-    memcpy(sharedEdges + edgeOffsetAll[4]*2, edgesTruncOctahedron,36 * 2);
-
-    // 3) Copy Euler orders
-    sharedEulerOrder = sharedEdges + (126 * 2);
-    memcpy(sharedEulerOrder + eulerOffsetAll[0], eulerOcta,       12 );
-    memcpy(sharedEulerOrder + eulerOffsetAll[1], eulerCubo,       24 );
-    memcpy(sharedEulerOrder + eulerOffsetAll[2], eulerRhdDodec,   24 );
-    memcpy(sharedEulerOrder + eulerOffsetAll[3], eulerRhdIcosa,   30 );
-    memcpy(sharedEulerOrder + eulerOffsetAll[4], eulerTruncOcta,  36 );
+    if (maxL == 0.0f) maxL = 1.0f;
+    float invL = 1.0f / maxL;
+    for (int i = 0; i < 8; ++i) {
+        sharedVerts[i][0] *= invL;
+        sharedVerts[i][1] *= invL;
+        sharedVerts[i][2] *= invL;
+    }
 }
 
 //—-----------------------------------------------------------------------------------------------
@@ -452,6 +413,31 @@ static void normalize3(float* v) {
         v[1] /= L;
         v[2] /= L;
     }
+}
+
+static inline float oscWave(int type, float phase) {
+    phase -= floorf(phase);
+    switch (type) {
+        case 0: // Square
+            return (phase < 0.5f) ? 1.0f : -1.0f;
+        case 1: // Triangle
+            return (phase < 0.5f) ? (4.0f*phase-1.0f) : (3.0f-4.0f*phase);
+        case 2: // Saw
+            return 1.0f - 2.0f*phase;
+        case 3: // Ramp
+            return 2.0f*phase - 1.0f;
+        case 4: // Sine
+        default:
+            return sinf(2.0f * 3.14159265f * phase);
+    }
+}
+
+static inline float getCourseFactor(int idx) {
+    if (idx == 0) return 0.25f;
+    if (idx == 1) return 1.0f / 3.0f;
+    if (idx == 2) return 0.5f;
+    if (idx == 3) return 1.0f;
+    return static_cast<float>(idx - 2);
 }
 
 //—-----------------------------------------------------------------------------------------------
@@ -518,17 +504,37 @@ void parameterChanged(_NT_algorithm* baseSelf, int p) {
             raw = inst->v[9];
             inst->iOutBus = raw;
             break;
-        case 10: // Solid
+        case 10: // BlankWindow
             raw = inst->v[10];
-            inst->solidParam = raw;
-            break;
-        case 11: // BlankWindow
-            raw = inst->v[11];
             inst->blankWindow_us = static_cast<float>(raw);
             break;
-        case 12: // BlankPhase
-            raw = inst->v[12];
+        case 11: // BlankPhase
+            raw = inst->v[11];
             inst->blankPhase_us = static_cast<float>(raw);
+            break;
+        case 12: // Resolution
+            raw = inst->v[12];
+            inst->resolution = raw;
+            break;
+        case 13: // AmpMod
+            raw = inst->v[13];
+            inst->ampModAmt = static_cast<float>(raw) / 127.0f;
+            break;
+        case 14: // AmpCorse
+            raw = inst->v[14];
+            inst->ampCorseIdx = raw;
+            break;
+        case 15: // AmpFine
+            raw = inst->v[15];
+            inst->ampFine = raw;
+            break;
+        case 16: // AmpWave
+            raw = inst->v[16];
+            inst->ampWave = raw;
+            break;
+        case 17: // AmpPhase
+            raw = inst->v[17];
+            inst->ampPhaseOffset = static_cast<float>(raw) / 360.0f;
             break;
         default:
             break;
@@ -559,14 +565,7 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
     int   numFrames = numFramesBy4 * 4;
     float fs        = static_cast<float>(NT_globals.sampleRate);
     float freq      = inst->freq_Hz;
-
-    int sParam      = inst->solidParam / 100;
-    if (sParam > 4) sParam = 4;
-
-    int vOff   = vertOffset[sParam];
-    int eOff   = edgeOffsetAll[sParam];
-    int eLen   = numEdgesArr[sParam];
-    int euOff  = eulerOffsetAll[sParam];
+    int   eLen      = numSegments;
 
     // Get output buses:
     int busXidx = inst->xOutBus;
@@ -577,14 +576,32 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
     float* busI = busFrames + busIidx * numFrames;
 
     // Compute blank fractions:
-    float blankFrac = inst->blankWindow_us * 1e-6f * freq * static_cast<float>(eLen);
+    // Use a fixed reference frequency so blanking covers the same path length
+    // regardless of the drawing frequency. This keeps reposition moves hidden
+    // even when the animation slows down.
+    const float freqRef = 50.0f;  // reference = default Frequency parameter
+    float blankFrac = inst->blankWindow_us * 1e-6f * freqRef * static_cast<float>(eLen);
     if (blankFrac > 0.5f) blankFrac = 0.5f;
-    float shiftFrac = inst->blankPhase_us * 1e-6f * freq * static_cast<float>(eLen);
+    float shiftFrac = inst->blankPhase_us * 1e-6f * freqRef * static_cast<float>(eLen);
+
+    float ampCourseFac = getCourseFactor(inst->ampCorseIdx);
+    float ampFreqBase  = freq * ampCourseFac;
+    float ampFreq      = ampFreqBase + (static_cast<float>(inst->ampFine) * 0.1f);
+    if (ampFreq < 0.0f) ampFreq = 0.0f;
+    float ampPhase     = inst->ampPhase;
 
     float phase = inst->phase;
     for (int i = 0; i < numFrames; ++i) {
+        
+
         phase += (freq / fs);
         if (phase >= 1.0f) phase -= 1.0f;
+
+        // Amplitude modulation oscillator
+        ampPhase += (ampFreq / fs);
+        if (ampPhase >= 1.0f) ampPhase -= floorf(ampPhase);
+        float ampVal = oscWave(inst->ampWave, ampPhase + inst->ampPhaseOffset);
+        float ampMul = 1.0f + inst->ampModAmt * ampVal;
 
         float ePos = phase * static_cast<float>(eLen);
         int   idx  = static_cast<int>(floorf(ePos));
@@ -595,17 +612,17 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
         if (fShift <  0.0f) fShift += 1.0f;
         if (fShift >= 1.0f) fShift -= 1.0f;
 
-        int edgeID = sharedEulerOrder[euOff + idx];
-        uint8_t vA = sharedEdges[(eOff + edgeID)*2 + 0];
-        uint8_t vB = sharedEdges[(eOff + edgeID)*2 + 1];
+        const Segment& seg = cubeSegments[idx];
+        uint8_t vA = seg.a;
+        uint8_t vB = seg.b;
 
         // Interpolate endpoints:
-        float Ax = sharedVerts[vOff + vA][0];
-        float Ay = sharedVerts[vOff + vA][1];
-        float Az = sharedVerts[vOff + vA][2];
-        float Bx = sharedVerts[vOff + vB][0];
-        float By = sharedVerts[vOff + vB][1];
-        float Bz = sharedVerts[vOff + vB][2];
+        float Ax = sharedVerts[vA][0];
+        float Ay = sharedVerts[vA][1];
+        float Az = sharedVerts[vA][2];
+        float Bx = sharedVerts[vB][0];
+        float By = sharedVerts[vB][1];
+        float Bz = sharedVerts[vB][2];
         float Px = (1.0f - frac)*Ax + frac*Bx;
         float Py = (1.0f - frac)*Ay + frac*By;
         float Pz = (1.0f - frac)*Az + frac*Bz;
@@ -622,6 +639,14 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
         float Xr = inst->cosZ * X2 - inst->sinZ * Y2;
         float Yr = inst->sinZ * X2 + inst->cosZ * Y2;
         float Zr = Z2;
+
+        if (inst->resolution > 0) {
+            float res = static_cast<float>(inst->resolution);
+            float scaleQ = res * 0.5f;
+            Xr = roundf((Xr + 1.0f) * scaleQ) / scaleQ - 1.0f;
+            Yr = roundf((Yr + 1.0f) * scaleQ) / scaleQ - 1.0f;
+            Zr = roundf((Zr + 1.0f) * scaleQ) / scaleQ - 1.0f;
+        }
 
         // Project:
         float Xv, Yv;
@@ -644,17 +669,19 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
         }
 
         // No culling: always draw
-        bool hidden = false;
-        float Iout = 5.0f;
-        if ((fShift < blankFrac) || (fShift > (1.0f - blankFrac))) {
+        float Iout = (seg.draw ? 5.0f : 0.0f);
+        if (seg.draw && ((fShift < blankFrac) || (fShift > (1.0f - blankFrac)))) {
             Iout = 0.0f;
         }
 
-        busX[i] = Xv;
-        busY[i] = Yv;
+        float outX = Xv * ampMul;
+        float outY = Yv * ampMul;
+        busX[i] = outX;
+        busY[i] = outY;
         busI[i] = Iout;
     }
-    inst->phase = phase;
+    inst->phase     = phase;
+    inst->ampPhase  = ampPhase;
 }
 
 //—-----------------------------------------------------------------------------------------------
@@ -663,8 +690,8 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
 
 static const _NT_factory polyFactory = {
     .guid                        = NT_MULTICHAR('P','O','L','Y'),
-    .name                        = "PolyWireEulerian5NoCull",
-    .description                 = "5 Eulerian solids (no culling): Octa, Cubocta, RhdDodec, RhdIcosa, TruncOcta",
+    .name                        = "CubeWireNoCull",
+    .description                 = "Wireframe cube (no culling)",
     .numSpecifications           = 0,
     .specifications              = nullptr,
     .calculateStaticRequirements = calculateStaticRequirements,
