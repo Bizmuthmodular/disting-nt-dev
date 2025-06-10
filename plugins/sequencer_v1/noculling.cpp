@@ -179,6 +179,107 @@ static const _NT_parameter paramBlankPhase = {
     .enumStrings = NULL
 };
 
+// Offset parameters ------------------------------------------------------------
+static const _NT_parameter paramXOff = {
+    .name        = "Xoff",
+    .min         = -400,
+    .max         = 400,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramYOff = {
+    .name        = "Yoff",
+    .min         = -400,
+    .max         = 400,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramZOff = {
+    .name        = "Zoff",
+    .min         = -400,
+    .max         = 400,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramXMod = {
+    .name        = "Xmod",
+    .min         = 0,
+    .max         = 100,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramYMod = {
+    .name        = "Ymod",
+    .min         = 0,
+    .max         = 100,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramZMod = {
+    .name        = "Zmod",
+    .min         = 0,
+    .max         = 100,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramOffCorse = {
+    .name        = "OffCorse",
+    .min         = 0,
+    .max         = 34,
+    .def         = 4,
+    .unit        = kNT_unitEnum,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = modCourseStrings
+};
+
+static const _NT_parameter paramOffFine = {
+    .name        = "OffFine",
+    .min         = -100,
+    .max         = 100,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
+static const _NT_parameter paramOffWave = {
+    .name        = "OffWave",
+    .min         = 0,
+    .max         = 4,
+    .def         = 4,
+    .unit        = kNT_unitEnum,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = modWaveStrings
+};
+
+static const _NT_parameter paramOffPhase = {
+    .name        = "OffPhase",
+    .min         = 0,
+    .max         = 360,
+    .def         = 0,
+    .unit        = kNT_unitNone,
+    .scaling     = kNT_scalingNone,
+    .enumStrings = NULL
+};
+
 // Frequency Modulation parameters ------------------------------------------------
 
 static const char* const modCourseStrings[] = {
@@ -271,12 +372,22 @@ static const _NT_parameter allParams[] = {
     paramIOut,         //  9
     paramBlankWindow,  // 10
     paramBlankPhase,   // 11
-    paramResolution,   // 12
-    paramAmpMod,       // 13
-    paramAmpCorse,     // 14
-    paramAmpFine,      // 15
-    paramAmpWave,      // 16
-    paramAmpPhase      // 17
+    paramXOff,         // 12
+    paramYOff,         // 13
+    paramZOff,         // 14
+    paramXMod,         // 15
+    paramYMod,         // 16
+    paramZMod,         // 17
+    paramOffCorse,     // 18
+    paramOffFine,      // 19
+    paramOffWave,      // 20
+    paramOffPhase,     // 21
+    paramResolution,   // 22
+    paramAmpMod,       // 23
+    paramAmpCorse,     // 24
+    paramAmpFine,      // 25
+    paramAmpWave,      // 26
+    paramAmpPhase      // 27
 };
 
 static const uint8_t page1_indices[] = { 0 };
@@ -284,8 +395,9 @@ static const uint8_t page2_indices[] = { 1, 2, 3 };
 static const uint8_t page3_indices[] = { 4, 5, 6 };
 static const uint8_t page4_indices[] = { 7, 8, 9 };
 static const uint8_t page5_indices[] = { 10, 11 };
-static const uint8_t page6_indices[] = { 12 };
-static const uint8_t page7_indices[] = { 13, 14, 15, 16, 17 };
+static const uint8_t page6_indices[] = { 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
+static const uint8_t page7_indices[] = { 22 };
+static const uint8_t page8_indices[] = { 23, 24, 25, 26, 27 };
 
 static const _NT_parameterPage pages[] = {
     { "Frequency",   1,  page1_indices },
@@ -293,12 +405,13 @@ static const _NT_parameterPage pages[] = {
     { "Camera",      3,  page3_indices },
     { "Routing",     3,  page4_indices },
     { "Blanking",    2,  page5_indices },
-    { "Quantize",    1,  page6_indices },
-    { "AmpMod",      5,  page7_indices }
+    { "Offset",     10,  page6_indices },
+    { "Quantize",    1,  page7_indices },
+    { "AmpMod",      5,  page8_indices }
 };
 
 static const _NT_parameterPages parameterPages = {
-    .numPages = 7,
+    .numPages = 8,
     .pages    = pages
 };
 
@@ -316,6 +429,17 @@ struct PolyInstance : public _NT_algorithm {
     int   projectionMode; // 0=Ortho, 1=Persp
     int   polarity;       // 0=Normal, 1=Inverted
     int   xOutBus, yOutBus, iOutBus;
+
+    // Offset base values
+    float xOff, yOff, zOff;
+    // Offset modulation amounts
+    float xModAmt, yModAmt, zModAmt;
+    // Offset modulation oscillator
+    int   offCorseIdx;
+    int   offFine;
+    int   offWave;
+    float offPhaseOffset;
+    float offPhase;
 
     // Amplitude modulation state
     float ampModAmt;       // 0..1
@@ -343,6 +467,13 @@ struct PolyInstance : public _NT_algorithm {
         projectionMode   = 1;
         polarity         = 0;
         xOutBus = 12; yOutBus = 13; iOutBus = 14;
+        xOff = 0.0f; yOff = 0.0f; zOff = 0.0f;
+        xModAmt = 0.0f; yModAmt = 0.0f; zModAmt = 0.0f;
+        offCorseIdx = 4;
+        offFine = 0;
+        offWave = 4;
+        offPhaseOffset = 0.0f;
+        offPhase = 0.0f;
         resolution       = 0;
         ampModAmt        = 0.0f;
         ampCorseIdx      = 4;
@@ -512,28 +643,68 @@ void parameterChanged(_NT_algorithm* baseSelf, int p) {
             raw = inst->v[11];
             inst->blankPhase_us = static_cast<float>(raw);
             break;
-        case 12: // Resolution
+        case 12: // Xoff
             raw = inst->v[12];
+            inst->xOff = static_cast<float>(raw) * 0.01f;
+            break;
+        case 13: // Yoff
+            raw = inst->v[13];
+            inst->yOff = static_cast<float>(raw) * 0.01f;
+            break;
+        case 14: // Zoff
+            raw = inst->v[14];
+            inst->zOff = static_cast<float>(raw) * 0.01f;
+            break;
+        case 15: // Xmod
+            raw = inst->v[15];
+            inst->xModAmt = static_cast<float>(raw) / 100.0f;
+            break;
+        case 16: // Ymod
+            raw = inst->v[16];
+            inst->yModAmt = static_cast<float>(raw) / 100.0f;
+            break;
+        case 17: // Zmod
+            raw = inst->v[17];
+            inst->zModAmt = static_cast<float>(raw) / 100.0f;
+            break;
+        case 18: // OffCorse
+            raw = inst->v[18];
+            inst->offCorseIdx = raw;
+            break;
+        case 19: // OffFine
+            raw = inst->v[19];
+            inst->offFine = raw;
+            break;
+        case 20: // OffWave
+            raw = inst->v[20];
+            inst->offWave = raw;
+            break;
+        case 21: // OffPhase
+            raw = inst->v[21];
+            inst->offPhaseOffset = static_cast<float>(raw) / 360.0f;
+            break;
+        case 22: // Resolution
+            raw = inst->v[22];
             inst->resolution = raw;
             break;
-        case 13: // AmpMod
-            raw = inst->v[13];
+        case 23: // AmpMod
+            raw = inst->v[23];
             inst->ampModAmt = static_cast<float>(raw) / 127.0f;
             break;
-        case 14: // AmpCorse
-            raw = inst->v[14];
+        case 24: // AmpCorse
+            raw = inst->v[24];
             inst->ampCorseIdx = raw;
             break;
-        case 15: // AmpFine
-            raw = inst->v[15];
+        case 25: // AmpFine
+            raw = inst->v[25];
             inst->ampFine = raw;
             break;
-        case 16: // AmpWave
-            raw = inst->v[16];
+        case 26: // AmpWave
+            raw = inst->v[26];
             inst->ampWave = raw;
             break;
-        case 17: // AmpPhase
-            raw = inst->v[17];
+        case 27: // AmpPhase
+            raw = inst->v[27];
             inst->ampPhaseOffset = static_cast<float>(raw) / 360.0f;
             break;
         default:
@@ -590,12 +761,21 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
     if (ampFreq < 0.0f) ampFreq = 0.0f;
     float ampPhase     = inst->ampPhase;
 
+    float offCourseFac = getCourseFactor(inst->offCorseIdx);
+    float offFreq      = freq * offCourseFac + (static_cast<float>(inst->offFine) * 0.1f);
+    if (offFreq < 0.0f) offFreq = 0.0f;
+    float offPhase     = inst->offPhase;
+
     float phase = inst->phase;
     for (int i = 0; i < numFrames; ++i) {
         
 
         phase += (freq / fs);
         if (phase >= 1.0f) phase -= 1.0f;
+
+        offPhase += (offFreq / fs);
+        if (offPhase >= 1.0f) offPhase -= floorf(offPhase);
+        float offVal = oscWave(inst->offWave, offPhase + inst->offPhaseOffset);
 
         // Amplitude modulation oscillator
         ampPhase += (ampFreq / fs);
@@ -640,6 +820,10 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
         float Yr = inst->sinZ * X2 + inst->cosZ * Y2;
         float Zr = Z2;
 
+        Xr += inst->xOff + inst->xModAmt * offVal;
+        Yr += inst->yOff + inst->yModAmt * offVal;
+        Zr += inst->zOff + inst->zModAmt * offVal;
+
         if (inst->resolution > 0) {
             float res = static_cast<float>(inst->resolution);
             float scaleQ = res * 0.5f;
@@ -682,6 +866,7 @@ void step(_NT_algorithm* baseSelf, float* busFrames, int numFramesBy4) {
     }
     inst->phase     = phase;
     inst->ampPhase  = ampPhase;
+    inst->offPhase  = offPhase;
 }
 
 //—-----------------------------------------------------------------------------------------------
