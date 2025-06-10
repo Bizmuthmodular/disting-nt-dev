@@ -1,8 +1,10 @@
 // cube_wireframe_nocull.cpp
 //
 // Disting NT plugin: Draws a rotating wireframe cube on an XY oscilloscope.
-// • The cube is normalised using a single scale factor so all vertices lie on a
-//   unit sphere.
+// The plugin also contains variants for several Eulerian solids. During
+// initialisation each solid is rescaled using one factor so all its vertices
+// lie on a unit sphere. This ensures consistent output geometry across the
+// different shapes.
 // • Each edge is traversed in a fixed order with blanked reposition moves so the
 //   geometry is correct with no undesired path jumps.
 // • No hidden‐line culling (all edges are always drawn when the beam is on).
