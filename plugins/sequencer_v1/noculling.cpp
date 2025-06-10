@@ -240,6 +240,20 @@ static const _NT_parameter paramZMod = {
     .enumStrings = NULL
 };
 
+// Frequency Modulation parameters ---------------------------------------------
+static const char* const modCourseStrings[] = {
+    "/4", "/3", "/2", "0",
+    "x2",  "x3",  "x4",  "x5",  "x6",  "x7",  "x8",  "x9",
+    "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17",
+    "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25",
+    "x26", "x27", "x28", "x29", "x30", "x31", "x32",
+    NULL
+};
+
+static const char* const modWaveStrings[] = {
+    "Square", "Triangle", "Saw", "Ramp", "Sine", NULL
+};
+
 static const _NT_parameter paramOffCorse = {
     .name        = "OffCorse",
     .min         = 0,
@@ -277,19 +291,6 @@ static const _NT_parameter paramOffPhase = {
     .def         = 0,
     .unit        = kNT_unitNone,
     .scaling     = kNT_scalingNone,
-    .enumStrings = NULL
-};
-
-// Frequency Modulation parameters ------------------------------------------------
-
-static const char* const modCourseStrings[] = {
-    "/4", "/3", "/2", "0",
-    "x2",  "x3",  "x4",  "x5",  "x6",  "x7",  "x8",  "x9",
-    "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17",
-    "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25",
-    "x26", "x27", "x28", "x29", "x30", "x31", "x32",
-    NULL
-};
 
 
 // Amplitude Modulation parameters ------------------------------------------------
@@ -325,9 +326,6 @@ static const _NT_parameter paramAmpCorse = {
     .enumStrings = modCourseStrings
 };
 
-static const char* const modWaveStrings[] = {
-    "Square", "Triangle", "Saw", "Ramp", "Sine", NULL
-};
 
 static const _NT_parameter paramAmpFine = {
     .name        = "AmpFine",
