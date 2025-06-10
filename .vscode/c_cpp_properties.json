@@ -1,19 +1,22 @@
 {
-  "configurations": [
-    {
-      "name": "Mac",
-      "includePath": [
-        "${workspaceFolder}/api/**",
-        "${workspaceFolder}/plugins/**",
-        "${workspaceFolder}/api/distingnt",
-        "${workspaceFolder}/**"
-      ],
-      "defines": [],
-      "compilerPath": "/Applications/ARM/bin/arm-none-eabi-g++",
-      "cStandard": "c11",
-      "cppStandard": "c++11",
-      "intelliSenseMode": "macos-gcc-arm"
-    }
-  ],
-  "version": 4
+    "configurations": [
+        {
+            "name": "ARM",
+            "includePath": [
+                "${workspaceFolder}/api"
+            ],
+            "defines": [],
+            "compilerPath": "/Applications/ARM/bin/arm-none-eabi-c++",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-arm",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/api"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
 }
